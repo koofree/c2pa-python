@@ -16,57 +16,63 @@ import pytest
 import tempfile
 import shutil
 import unittest
+import hashlib
 
-from c2pa import Builder, Error, Reader, SigningAlg, create_signer, sdk_version, sign_ps256, version
+from c2pa import (
+    Builder,
+    Error,
+    Reader,
+    SigningAlg,
+    create_signer,
+    sdk_version,
+    sign_ps256,
+    version,
+    DataHash,
+)
 
 # a little helper function to get a value from a nested dictionary
 from functools import reduce
 import operator
 
+
 def getitem(d, key):
     return reduce(operator.getitem, key, d)
 
+
 # define the manifest we will use for testing
 manifest_def = {
-    "claim_generator_info": [{
-        "name": "python test",
-        "version": "0.1"
-    }],
+    "claim_generator_info": [{"name": "python test", "version": "0.1"}],
     "title": "My Title",
-    "thumbnail": {
-        "format": "image/jpeg",
-        "identifier": "A.jpg"
-    },
+    "thumbnail": {"format": "image/jpeg", "identifier": "A.jpg"},
     "assertions": [
-    {
+        {
             "label": "c2pa.training-mining",
             "data": {
                 "entries": {
-                "c2pa.ai_generative_training": { "use": "notAllowed" },
-                "c2pa.ai_inference": { "use": "notAllowed" },
-                "c2pa.ai_training": { "use": "notAllowed" },
-                "c2pa.data_mining": { "use": "notAllowed" }
+                    "c2pa.ai_generative_training": {"use": "notAllowed"},
+                    "c2pa.ai_inference": {"use": "notAllowed"},
+                    "c2pa.ai_training": {"use": "notAllowed"},
+                    "c2pa.data_mining": {"use": "notAllowed"},
                 }
-            }
+            },
         }
-    ]
+    ],
 }
 
 # ingredient we will use for testing
 ingredient_def = {
     "relationship": "parentOf",
-    "thumbnail": {
-        "identifier": "A.jpg",
-        "format": "image/jpeg"
-    }
+    "thumbnail": {"identifier": "A.jpg", "format": "image/jpeg"},
 }
+
 
 class TestC2paSdk(unittest.TestCase):
     def test_version(self):
-        assert version() == "0.7.1"
+        assert version() == "0.7.2"
 
     def test_sdk_version(self):
         assert "c2pa-rs/" in sdk_version()
+
 
 class TestReader(unittest.TestCase):
     def test_v2_read_cloud_manifest(self):
@@ -75,28 +81,40 @@ class TestReader(unittest.TestCase):
         assert manifest is not None
 
     def test_v2_read(self):
-        #example of reading a manifest store from a file
+        # example of reading a manifest store from a file
         try:
             reader = Reader.from_file("tests/fixtures/C.jpg")
             manifest = reader.get_active_manifest()
             assert manifest is not None
             assert "make_test_images" in manifest["claim_generator"]
-            assert manifest["title"]== "C.jpg"
+            assert manifest["title"] == "C.jpg"
             assert manifest["format"] == "image/jpeg"
             # There should be no validation status errors
             assert manifest.get("validation_status") == None
             # read creative work assertion (author name)
-            assert getitem(manifest,("assertions",0,"label")) == "stds.schema-org.CreativeWork"
-            assert getitem(manifest,("assertions",0,"data","author",0,"name")) == "Adobe make_test"
+            assert (
+                getitem(manifest, ("assertions", 0, "label"))
+                == "stds.schema-org.CreativeWork"
+            )
+            assert (
+                getitem(manifest, ("assertions", 0, "data", "author", 0, "name"))
+                == "Adobe make_test"
+            )
             # read Actions assertion
-            assert getitem(manifest,("assertions",1,"label")) == "c2pa.actions"
-            assert getitem(manifest,("assertions",1,"data","actions",0,"action")) == "c2pa.created"
+            assert getitem(manifest, ("assertions", 1, "label")) == "c2pa.actions"
+            assert (
+                getitem(manifest, ("assertions", 1, "data", "actions", 0, "action"))
+                == "c2pa.created"
+            )
             # read signature info
-            assert getitem(manifest,("signature_info","issuer")) == "C2PA Test Signing Cert"
+            assert (
+                getitem(manifest, ("signature_info", "issuer"))
+                == "C2PA Test Signing Cert"
+            )
             # read thumbnail data from file
-            assert getitem(manifest,("thumbnail","format")) == "image/jpeg"
+            assert getitem(manifest, ("thumbnail", "format")) == "image/jpeg"
             # check the thumbnail data
-            uri = getitem(manifest,("thumbnail","identifier"))
+            uri = getitem(manifest, ("thumbnail", "identifier"))
             reader.resource_to_file(uri, "target/thumbnail_read_v2.jpg")
 
         except Exception as e:
@@ -107,18 +125,22 @@ class TestReader(unittest.TestCase):
         with pytest.raises(Error.ManifestNotFound) as err:
             reader = Reader.from_file("tests/fixtures/A.jpg")
 
+
 class TestSignerr(unittest.TestCase):
     def test_v2_sign(self):
         # define a source folder for any assets we need to read
         data_dir = "tests/fixtures/"
         try:
             key = open(data_dir + "ps256.pem", "rb").read()
+
             def sign(data: bytes) -> bytes:
                 return sign_ps256(data, key)
 
             certs = open(data_dir + "ps256.pub", "rb").read()
             # Create a local signer from a certificate pem file
-            signer = create_signer(sign, SigningAlg.PS256, certs, "http://timestamp.digicert.com")
+            signer = create_signer(
+                sign, SigningAlg.PS256, certs, "http://timestamp.digicert.com"
+            )
 
             builder = Builder(manifest_def)
 
@@ -134,7 +156,9 @@ class TestSignerr(unittest.TestCase):
                 output_path = output_dir + "out.jpg"
                 if os.path.exists(output_path):
                     os.remove(output_path)
-                c2pa_data = builder.sign_file(signer, data_dir + "A.jpg", output_dir + "out.jpg")
+                c2pa_data = builder.sign_file(
+                    signer, data_dir + "A.jpg", output_dir + "out.jpg"
+                )
                 assert len(c2pa_data) > 0
 
             reader = Reader.from_file(output_dir + "out.jpg")
@@ -143,8 +167,8 @@ class TestSignerr(unittest.TestCase):
             manifest = manifest_store["manifests"][manifest_store["active_manifest"]]
             assert "python_test" in manifest["claim_generator"]
             # check custom title and format
-            assert manifest["title"]== "My Title" 
-            assert manifest,["format"] == "image/jpeg"
+            assert manifest["title"] == "My Title"
+            assert manifest, ["format"] == "image/jpeg"
             # There should be no validation status errors
             assert manifest.get("validation_status") == None
             assert manifest["ingredients"][0]["relationship"] == "parentOf"
@@ -158,12 +182,15 @@ class TestSignerr(unittest.TestCase):
         data_dir = "tests/fixtures/"
         try:
             key = open(data_dir + "ps256.pem", "rb").read()
+
             def sign(data: bytes) -> bytes:
                 return sign_ps256(data, key)
 
             certs = open(data_dir + "ps256.pub", "rb").read()
             # Create a local signer from a certificate pem file
-            signer = create_signer(sign, SigningAlg.PS256, certs, "http://timestamp.digicert.com")
+            signer = create_signer(
+                sign, SigningAlg.PS256, certs, "http://timestamp.digicert.com"
+            )
 
             builder = Builder(manifest_def)
 
@@ -180,13 +207,28 @@ class TestSignerr(unittest.TestCase):
                 manifest = reader.get_active_manifest()
 
                 # check custom title and format
-                assert manifest["title"]== "My Title" 
+                assert manifest["title"] == "My Title"
                 assert manifest["format"] == "image/jpeg"
                 # There should be no validation status errors
                 assert manifest.get("validation_status") == None
         except Exception as e:
             print("Failed to sign manifest store: " + str(e))
-            #exit(1)
+            # exit(1)
 
-if __name__ == '__main__':
+    def test_data_hash(self):
+        data_hash = DataHash("test", "sha256")
+        hash = data_hash.hash_from_stream(open("tests/fixtures/A.jpg", "rb"))
+        assert hash is not None
+        hash_str = hash.hex()
+        self.assertEqual(
+            hash_str, "f999fd78bfe8a83c96e468a078830ba94485bc1bc6fd086fb94a43bd29dd0f23"
+        )
+
+        self.assertEqual(
+            hash_str,
+            hashlib.sha256(open("tests/fixtures/A.jpg", "rb").read()).hexdigest(),
+        )
+
+
+if __name__ == "__main__":
     unittest.main()

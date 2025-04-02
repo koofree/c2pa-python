@@ -111,3 +111,10 @@ interface Builder {
   [Throws=Error]
   bytes sign_file([ByRef] CallbackSigner signer, [ByRef] string input, [ByRef] string output);
 };
+
+interface DataHash {
+  constructor([ByRef] string name, [ByRef] string alg);
+
+  [Throws=Error]
+  bytes hash_from_stream([ByRef] Stream stream );
+};

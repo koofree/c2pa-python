@@ -252,3 +252,25 @@ impl Builder {
         }
     }
 }
+
+pub struct DataHash {
+    data_hash: RwLock<c2pa::assertions::DataHash>,
+}
+
+impl DataHash {
+    pub fn new(name: &str, alg: &str) -> Self {
+        Self {
+            data_hash: RwLock::new(c2pa::assertions::DataHash::new(name, alg)),
+        }
+    }
+
+    pub fn hash_from_stream(&self, stream: &dyn Stream) -> Result<Vec<u8>> {
+        if let Ok(mut data_hash) = self.data_hash.try_write() {
+            let mut stream = StreamAdapter::from(stream);
+            let hash = data_hash.hash_from_stream(&mut stream)?;
+            Ok(hash)
+        } else {
+            Err(Error::RwLock)
+        }
+    }
+}

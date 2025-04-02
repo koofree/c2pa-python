@@ -18,8 +18,16 @@ from .c2pa_api import (
     create_remote_signer,
     sign_ps256,
     load_settings_file,
+    DataHash,
 )
-from .c2pa import Error, SigningAlg, CallbackSigner, sdk_version, version, load_settings
+from .c2pa import (
+    Error,
+    SigningAlg,
+    CallbackSigner,
+    sdk_version,
+    version,
+    load_settings,
+)
 from .c2pa.c2pa import (
     _UniffiConverterTypeSigningAlg,
     _UniffiConverterTypeReader,
@@ -42,4 +50,5 @@ __all__ = [
     "_UniffiConverterTypeSigningAlg",
     "_UniffiRustBuffer",
     "_UniffiConverterTypeReader",
+    "DataHash",
 ]

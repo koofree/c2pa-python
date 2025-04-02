@@ -263,3 +263,11 @@ def load_settings_file(path: str, format=None):
             format = os.path.splitext(path)[1][1:]
         settings = file.read()
     api.load_settings(settings, format)
+    
+
+class DataHash(api.DataHash):
+    def __init__(self, name: str, alg: str):
+        super().__init__(name, alg)
+
+    def hash_from_stream(self, stream: api.Stream) -> bytes:
+        return super().hash_from_stream(C2paStream(stream))
